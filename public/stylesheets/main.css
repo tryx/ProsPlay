@@ -1,0 +1,29 @@
+body {
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-size: 15px;
+	color: #67655d;
+	background-color: #fff;
+	margin-left: 30px;
+}
+
+.greeting {
+	font-size: 30px;
+}
+
+.sub-greeting {
+	font-size: 20px;
+}
+
+.result .count {
+	text-align: right;
+	font-weight: bold;
+}
+
+#piechart {
+	width: 900px; 
+	height: 500px;
+}
+
+p {
+	margin-top: 50px;
+}

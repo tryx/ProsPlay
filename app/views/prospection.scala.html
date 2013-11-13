@@ -1,0 +1,53 @@
+@(results: Map[PatientType.Value, Int])
+@import models.PatientType._
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <link rel="stylesheet" media="screen" href=@routes.Assets.at("/stylesheets/main.css")>
+        <link rel="shortcut icon" type="image/png" href="@routes.Assets.at("/images/favicon.png")">
+	    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	    <script type="text/javascript">
+	      google.load("visualization", "1", {packages:["corechart"]});
+	      google.setOnLoadCallback(drawChart);
+	      function drawChart() {
+	        var data = google.visualization.arrayToDataTable([
+	          ['Type', 'Patient'],
+	          @for((patientClass, count) <-results) {
+	          	['@(patientClass)', @(count)],
+	          }
+	          
+	        ]);	
+	        var options = {
+	          title: 'B & I Analysis Result',
+	          pieHole: 0.4
+	        };	
+	        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+	        chart.draw(data, options);
+	      }
+	    </script>
+    </head>
+    <body>
+    	<p>
+    		<img src="@routes.Assets.at("/images/cat.png")" height="42" width="42">
+    		<span class="greeting">O Hai,</span>
+    		<span class="sub-greeting">according to your calculations... </span>
+    	</p>
+   		<table class="result">
+   		@for((patientClass, count) <-results) {
+
+   			<tr>
+   				<td class="desc">@patientClass</td>
+   				<td class="count">@count</td>
+   			</tr>
+   		}
+   		
+   		</table>
+    	<p>
+    		<img src="@routes.Assets.at("/images/cat.png")" height="42" width="42">
+    		<span class="greeting">Here,</span>
+    		<span class="sub-greeting">have a donut...</span>
+    	</p>
+   		<div id="piechart"></div>
+    </body>
+</html>
