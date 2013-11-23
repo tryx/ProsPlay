@@ -2,7 +2,8 @@ package models
 
 class PurchaseRecord(val day: Int, val medication: String, val patientID: Int)
 {
-	override def toString() = "day: %d, medication: %s, patient: %d" format (day, medication, patientID);  
+	override def toString() = "day: %d, medication: %s, patient: %d" format
+			(day, medication, patientID)  
 }
 
 object PurchaseRecord {
