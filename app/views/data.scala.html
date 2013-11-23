@@ -1,0 +1,28 @@
+@(data: collection.Map[Int, List[(PurchaseRecord, Int)]])
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Raw Data</title>
+</head>
+<body>
+<table>
+@for((patient,transactions) <- data) {
+	<tr> <td>Patient id @patient</td> </tr>
+	<tr>
+		<td> Day </td>
+		<td> Medication </td>
+		<td> Time since last script </td>
+	</tr>
+	@for((t,d) <- transactions) {
+		<tr>
+			<td> @t.day </td>
+			<td> @t.medication </td>
+			<td> @d
+		</tr>
+	}	
+}
+</table>
+
+</body>
+</html>
