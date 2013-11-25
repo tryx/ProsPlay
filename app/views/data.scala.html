@@ -1,4 +1,7 @@
-@(data: collection.Map[Int, List[(PurchaseRecord, Int)]])
+@(data: collection.Map[Int, List[(PurchaseRecord, Int)]], 
+	classData: collection.Map[Int, List[(PatientType.Value, PurchaseRecord)]])
+@import models.PatientType._
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -23,6 +26,25 @@
 	}	
 }
 </table>
+
+@for((p,c) <- classData) {
+<table>
+	<tr> <td>Patient @p</td> </tr>
+	<tr>
+		<td> Day </td>
+		<td> Classification </td>
+	</tr>
+	
+	@for((ptype,precord) <- c) {
+		<tr>
+			<td> @precord.day </td>
+			<td> @precord.medication </td>
+			<td> @ptype </td>
+		</tr>
+	}
+
+</table>
+}
 
 </body>
 </html>

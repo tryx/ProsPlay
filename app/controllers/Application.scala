@@ -10,7 +10,7 @@ object Application extends Controller {
   }
   
   def data = Action {
-    Ok(views.html.data(models.AnalysisResult.dumpData))
+    Ok(views.html.data(models.AnalysisResult.dumpData, models.AnalysisResult.testClassify))
   }
 
 }
