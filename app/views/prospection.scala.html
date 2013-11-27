@@ -1,4 +1,6 @@
-@(results: scala.collection.Map[PatientType.Value, Int])
+@(results: collection.Map[PatientType.Value, Int],
+  patientsByType: collection.Map[PatientType.Value, List[List[PurchaseRecord]]])
+  
 @import models.PatientType._
 <!DOCTYPE html>
 
@@ -6,6 +8,7 @@
     <head>
         <link rel="stylesheet" media="screen" href=@routes.Assets.at("/stylesheets/main.css")>
         <link rel="shortcut icon" type="image/png" href="@routes.Assets.at("/images/favicon.png")">
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 	    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 	    <script type="text/javascript">
 	      google.load("visualization", "1", {packages:["corechart"]});
@@ -23,6 +26,9 @@
 	          pieHole: 0.4
 	        };	
 	        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+	        google.visualization.events.addListener(chart, 'select', test);
+	        function test() {alert(chart.getSelection()[0].row)}
+	        	         
 	        chart.draw(data, options);
 	      }
 	    </script>
@@ -49,5 +55,6 @@
     		<span class="sub-greeting">have a donut...</span>
     	</p>
    		<div id="piechart"></div>
+   		<div id="details"></div>
     </body>
 </html>

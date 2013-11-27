@@ -6,7 +6,8 @@ import play.api.mvc._
 object Application extends Controller {
   
   def index = Action {
-    Ok(views.html.prospection(models.AnalysisResult.performBIAnalysis))
+    val (results, patientsByType) = models.AnalysisResult.performBIAnalysis
+    Ok(views.html.prospection(results, patientsByType))
   }
   
   def data = Action {
