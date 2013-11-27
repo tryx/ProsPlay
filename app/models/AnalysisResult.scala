@@ -71,30 +71,43 @@ object AnalysisResult {
 	
 	def classifyBatch(previous: List[PurchaseRecord], current: List[PurchaseRecord], status: PatientType): List[(PatientType, PurchaseRecord)] =
 	{
-//	   if (previous(0).patientID == 539)
-//	     true
+	   // The blocks are constructed so that previous the longest run of a single medication
+	   // so by construction there is a change in medication between previous and current.
+	   
+	  
 	   var newStatus = status
+	   
+	   // selectCurrent is the next block of purchases. We construct it early as occasionally
+	   // we need to look into the future to make a decision
 	   val (selectCurrent, future) = current.span(_.medication == current.head.medication)
-	   
-	   // Each segment is constructed to contain only a single drug so if we are here
-	   // there has been a switch in medication. Only need to determine whether it is valid
-	   // and if it is, for what reason.
-	   
 	   
 	   // if there's no overlap, they are independent admininstrations
 	   if (overlaps(previous.last, current.head)) {
 
 	     newStatus = status match { 
-		     case VALID_NO_COMED => if (selectCurrent.length == 1) trials(current.head.medication) else switches(current.head.medication)
+	    	 // if the upcoming block after this one has one element, we'll consider a trial
+	         // otherwise, treat it as a switch
+		     case VALID_NO_COMED => 
+		     {
+		       if (selectCurrent.length == 1)
+		         trials(current.head.medication) 
+		       else
+		         switches(current.head.medication)
+		     }
+ 			 
+		     // if the previous state was a valid trial, then by definition we must now be back
+		     // in a no co-medication state
 		     case (VALID_I_TRIAL | VALID_B_TRIAL) => VALID_NO_COMED
+		     
+		     // if we made a switch and have not yet had a chance to go back to non-comedicated
+		     // we are now in violation.
 		     case (VALID_IB_SWITCH | VALID_BI_SWITCH) => VIOLATED
+		     
+		     // if we were violating before, another switch can in no way turn it into a valid state
 		     case VIOLATED => VIOLATED
 	     }
-//		 if (selectCurrent.length == 1)
-//		   newStatus = if (status == VALID_NO_COMED) trials(current.head.medication) else VIOLATED
-//		 else
-//		   newStatus = if (status == VALID_NO_COMED) switches(current.head.medication) else VIOLATED
 	   }
+	   // if there is no overlap, we can reset the state and treat the rest independently
 	   else {
 	     newStatus = VALID_NO_COMED
 	   }
@@ -102,7 +115,6 @@ object AnalysisResult {
 	   val retVal = List((newStatus, current.head))
 	   
 	   // Base and recursive cases for recursion
-	   
 	   future match{
 	     case Nil => retVal
 	     case _   => retVal ++ classifyBatch(selectCurrent, future, newStatus)
