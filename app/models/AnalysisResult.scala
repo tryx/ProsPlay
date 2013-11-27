@@ -3,89 +3,29 @@ import PatientType._
 import scala.collection._
 
 object AnalysisResult {
-	val BDuration = 30
-	val IDuration = 90
+	
+	val drugDurations 	= Map("I" -> 90,			  "B" -> 30)
+	
+	// switching to drug {key}
+	val switches 		= Map("I" -> VALID_BI_SWITCH, "B" -> VALID_IB_SWITCH)
+	
+	// trialing drug {key}
+	val trials   		= Map("I" -> VALID_I_TRIAL,   "B" -> VALID_B_TRIAL)
   
 	def performBIAnalysis(): Map[PatientType, Int] =
 	{
-	  
-	  // Initialise the return array 
-	  val results = mutable.Map.empty[PatientType, Int]
+
+      val results = mutable.Map.empty[PatientType, Int]
 	  PatientType.values foreach {
 		  results(_) = 0
 	  }
-	  
-	  val patientResults = mutable.Map.empty[Int,PatientType]
-	  
-	  // load all purchases, sort them by date and break them down by customer
-	  val purchases = PurchaseRecord
-			  			.loadFromFile
-			  			.sortBy(_.day)
-			  			.groupBy(_.patientID);
-	  
-	  purchases.values foreach {purchaseList =>
-	  	var status = VALID_NO_COMED
-	  	val window = purchaseList.sliding(3)
-
-	  	window foreach {
-	  	case List(p1, p2, p3) => {
-		  val timeDifference = p2.day - p1.day
-		  val timeDifference2 = p3.day - p2.day
-
-		  // if there's no change in medication, can't have a new violation
-		  if (p1.medication != p2.medication) {
-		  p2.medication match {
-
-			  case "B" => {
-				if(timeDifference < BDuration) status match {
-				  // If patient was in violation, this can't help things	 		  	
-				  case VIOLATED => VIOLATED		
-		
-				  // assume first violation is a trial
-				  case VALID_NO_COMED => 
-				  if (p1.medication == p3.medication) VALID_B_TRIAL else VALID_IB_SWITCH
-		
-				  case VALID_IB_SWITCH => VIOLATED
-				  case VALID_BI_SWITCH => VIOLATED
-				  case VALID_B_TRIAL => VALID_B_TRIAL
-				  case VALID_I_TRIAL => VALID_NO_COMED
-				}
-			  }
-					  
-			  case "I" => {
-			    if(timeDifference < BDuration) status match {
-				  // If patient was in violation, this can't help things	 		  	
-				  case VIOLATED => VIOLATED		
-	
-				  // assume first violation is a trial
-				  case VALID_NO_COMED => 
-				    if (p1.medication == p3.medication) VALID_B_TRIAL else VALID_IB_SWITCH
-	
-				  case VALID_IB_SWITCH => VIOLATED
-				  case VALID_BI_SWITCH => VIOLATED
-				  case VALID_B_TRIAL => VALID_B_TRIAL
-				  case VALID_I_TRIAL => VALID_NO_COMED
-				  }
-				  
-			  }
-		  }}
-	  	}
-	  	case List(p1,p2) => status;
-	  	case List(p1) 	 => status
-	  	
-	  	val patient = purchaseList(0).patientID
-	  	patientResults(patient) = status;
-	  	}
-	}
-	 
-	  Map(
-	      VIOLATED -> 200,
-	      VALID_NO_COMED -> 500,
-	      VALID_BI_SWITCH -> 100,
-	      VALID_IB_SWITCH -> 100,
-	      VALID_I_TRIAL -> 50,
-	      VALID_B_TRIAL -> 50
-	  )
+      
+      // for each customer, pull out their worst status and record that to the total
+      testClassify.values foreach {customer =>
+      	val x = ((customer unzip) _1) max;
+      	results(x) += 1;
+      }      
+      results
 	}
 	
 	
@@ -101,89 +41,68 @@ object AnalysisResult {
 		}		
 	}
 	
-	def testClassify(): Map[Int, List[(PatientType,PurchaseRecord)]] = {
-	  // Initialise the return array 
-	  val results = mutable.Map.empty[PatientType, Int]
-	  PatientType.values foreach {
-		  results(_) = 0
-	  }
-	  
-	  val patientResults = mutable.Map.empty[Int,PatientType]
-	  
+	
+	def testClassify(): Map[Int, List[(PatientType,PurchaseRecord)]] = {	  
 	  // load all purchases, sort them by date and break them down by customer
 	  val purchases = PurchaseRecord
 			  			.loadFromFile
 			  			.sortBy(_.day)
 			  			.groupBy(_.patientID);
 	  
-	  purchases.mapValues {purchaseList =>
-	    val window = purchaseList.sliding(3)
-	    
-	    val statuses: List[PatientType] = window.scanLeft (VALID_NO_COMED)
-	    	{ (status, window) => parseWindow(window, status)} toList;
-	    val (sl, pl) = (statuses.length, purchaseList.length)
-	    (VALID_NO_COMED :: statuses) zip purchaseList 
+	  val x: Map[Int, List[(PatientType,PurchaseRecord)]] = purchases.mapValues {records =>
+		  val (firstRun, secondRun) = records.span(_.medication == records.head.medication)
+		  if (firstRun(0).patientID == 82)
+		    true
+		  
+		  // If second run is empty, then patient has only ever been on a single drug
+		  if (secondRun == Nil) 
+		    List((VALID_NO_COMED, firstRun.last))
+		  else 
+		    classifyBatch(firstRun, secondRun, VALID_NO_COMED)
+		    
 	  }
+	  x
+	}
+
+	
+	
+	def classifyBatch(previous: List[PurchaseRecord], current: List[PurchaseRecord], status: PatientType): List[(PatientType, PurchaseRecord)] =
+	{
+	   var newStatus = status
+	   
+	   // Each segment is constructed to contain only a single drug so if we are here
+	   // there has been a switch in medication. Only need to determine whether it is valid
+	   // and if it is, for what reason.
+	   
+	   
+	   // if there's no overlap, they are independent admininstrations
+	   if (overlaps(previous.last, current.head)) {
+	     // 
+		 if (current.length == 1)
+		   newStatus = if (status == VALID_NO_COMED) trials(current.head.medication) else VIOLATED
+		 else
+		   newStatus = if (status == VALID_NO_COMED) switches(current.head.medication) else VIOLATED
+	   }
+	   else {
+	     newStatus = VALID_NO_COMED
+	   }
+	  
+	   val retVal = List((newStatus, current.last))
+	   
+	   // Base and recursive cases for recursion
+	   val (newPrevious, newCurrent) = current.span(_.medication == current.head.medication)
+	   newCurrent match{
+	     case Nil => retVal
+	     case _   => retVal ++ classifyBatch(newPrevious, newCurrent, newStatus)
+	   }
 	}
 	
 	
 	// Return whether purchase of p2 would overlap with p1
 	def overlaps(p1: PurchaseRecord, p2: PurchaseRecord ): Boolean  = {
 		val timeDifference = p2.day - p1.day;
-		p2.medication match {
-		  case "B" => timeDifference > BDuration
-		  case "I" => timeDifference > IDuration
-		}
+		timeDifference < drugDurations(p1.medication)
 	}
-	
-	
-	def parseWindow(window: List[models.PurchaseRecord], status: PatientType)
-		:(PatientType) =
-	{
-	 window match {
-  	 case List(p1, p2, p3) => {
-		// if there's no change in medication, can't have a new violation
-		if (p1.medication != p2.medication) {
-		p2.medication match {
-
-		  case "B" => {
-			if(overlaps(p1, p2)) status match {
-			  // If patient was in violation, this can't help things	 		  	
-			  case VIOLATED => VIOLATED		
-		
-			  // assume first violation is a trial
-			  case VALID_NO_COMED => 
-			  if (p1.medication == p3.medication) VALID_I_TRIAL else VALID_BI_SWITCH
-		
-			  case VALID_IB_SWITCH => VIOLATED
-			  case VALID_BI_SWITCH => VIOLATED
-			  case VALID_B_TRIAL => VALID_B_TRIAL
-			  case VALID_I_TRIAL => VALID_NO_COMED
-			} else status
-		  }
-					  
-		  case "I" => {
-		    if(overlaps(p1, p2)) status match {
-			  // If patient was in violation, this can't help things	 		  	
-			  case VIOLATED => VIOLATED		
-
-			  // assume first violation is a trial
-			  case VALID_NO_COMED => 
-			    if (p1.medication == p3.medication) VALID_B_TRIAL else VALID_IB_SWITCH
-
-			  case VALID_IB_SWITCH => VIOLATED
-			  case VALID_BI_SWITCH => VIOLATED
-			  case VALID_B_TRIAL => VALID_B_TRIAL
-			  case VALID_I_TRIAL => VALID_NO_COMED
-			} else status
-				  
-		  }
-		}} else status
-	 }
-	 case List(p1,p2) => status
-	 case List(p1) 	 => status
-	 }
-    }
 
 }
 
