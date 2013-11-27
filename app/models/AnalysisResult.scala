@@ -73,18 +73,16 @@ object AnalysisResult {
 	{
 	   // The blocks are constructed so that previous the longest run of a single medication
 	   // so by construction there is a change in medication between previous and current.
-	   
 	  
-	   var newStatus = status
 	   
 	   // selectCurrent is the next block of purchases. We construct it early as occasionally
 	   // we need to look into the future to make a decision
 	   val (selectCurrent, future) = current.span(_.medication == current.head.medication)
 	   
 	   // if there's no overlap, they are independent admininstrations
-	   if (overlaps(previous.last, current.head)) {
+	   val newStatus = if (overlaps(previous.last, current.head)) {
 
-	     newStatus = status match { 
+	     status match { 
 	    	 // if the upcoming block after this one has one element, we'll consider a trial
 	         // otherwise, treat it as a switch
 		     case VALID_NO_COMED => 
@@ -109,7 +107,7 @@ object AnalysisResult {
 	   }
 	   // if there is no overlap, we can reset the state and treat the rest independently
 	   else {
-	     newStatus = VALID_NO_COMED
+	     VALID_NO_COMED
 	   }
 	  
 	   val retVal = List((newStatus, current.head))
