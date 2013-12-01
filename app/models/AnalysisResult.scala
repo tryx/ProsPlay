@@ -3,7 +3,18 @@ import PatientType._
 import scala.collection._
 
 object AnalysisResult {
+  
+	// these are expensive to calculate and we don't want to redo it
+	// for every ajax call, so cache them here
+	val purchases = PurchaseRecord
+					.loadFromFile
+					.sortBy(_.day)
+					.groupBy(_.patientID)
+		
+	var resultsCache: Map[PatientType, Int] = null
+	var patientsByTypeCache: Map[PatientType, List[List[PurchaseRecord]]] = null
 	
+	// abstract over the drug types as best we can
 	val drugDurations 	= Map("I" -> 90,			  "B" -> 30)
 	
 	// switching to drug {key}
@@ -11,49 +22,60 @@ object AnalysisResult {
 	
 	// trialing drug {key}
 	val trials   		= Map("I" -> VALID_I_TRIAL,   "B" -> VALID_B_TRIAL)
-  
+	
+	/**
+	 * 	Runs the classifier over the dataset returning a tuple consisting of a count of each type
+	 *  of patient and the transactions of each patient broken down by their category. 
+	 */
 	def performBIAnalysis(): (Map[PatientType, Int], Map[PatientType, List[List[PurchaseRecord]]] ) =
 	{
-      val results = mutable.Map.empty[PatientType, Int]
-      val patientsByType = mutable.Map.empty[PatientType, List[List[PurchaseRecord]]]
+	  if (resultsCache != null) {return (resultsCache, patientsByTypeCache)}
+
+	  // need to use immutable maps here as mutable.SortedMap is not yet implemented =\
+      var results = immutable.SortedMap.empty[PatientType, Int]
+      var patientsByType = immutable.SortedMap.empty[PatientType, List[List[PurchaseRecord]]]
 
 	  PatientType.values foreach {t =>
-		  results(t) = 0
-		  patientsByType(t) = List.empty[List[PurchaseRecord]]
+		  results = results updated (t, 0)
+		  patientsByType  = patientsByType updated (t, List.empty[List[PurchaseRecord]])
 	  }
-      
-      
+           
       // for each customer, pull out their worst status and record that to the total
-      testClassify.values foreach {customer =>
+      // and put that customer into the map for that status type
+      classify(purchases).values foreach {customer =>
         val (pTypes, pRecords) = (customer unzip)
       	val pType = pTypes max;
-      	results(pType) += 1;
-      	patientsByType(pType)  = patientsByType(pType) :+ pRecords
-      }      
+      	results = results updated (pType, results(pType) + 1);
+      	patientsByType = patientsByType updated (pType, patientsByType(pType) :+ pRecords)
+      }
+      if (resultsCache == null) {
+        resultsCache = results
+        patientsByTypeCache = patientsByType
+      }
       (results, patientsByType)
 	}
 	
-	
+	/**
+	 * Returns a map from a patient ID to a list of that patient's purchases coupled
+	 * with the time since the last purchase. A sliding window is moved along the purchase
+	 * history and the difference in dates is computed between each pair.
+	 */	
 	def dumpData(): Map[Int, List[(PurchaseRecord, Int)]] =
-	{
-		val x = PurchaseRecord
-				.loadFromFile
-				.sortBy(_.day)
-				.groupBy(_.patientID)
-				
-		x.mapValues {t => 
-		 	t zip 0 :: (t sliding(2) map {case List(p,q) => q.day - p.day; case List(p) => 0} toList)			
+	{	
+		// must prepend 0 to account for the very first puchase which is unpaired
+		purchases.mapValues {t => 
+		 	t zip 0 :: (t sliding(2) map {
+		 	  case List(p,q) => q.day - p.day
+		 	  case List(p) => 0} 
+		 	toList)			
 		}		
 	}
 	
-	
-	def testClassify(): Map[Int, List[(PatientType,PurchaseRecord)]] = {	  
-	  // load all purchases, sort them by date and break them down by customer
-	  val purchases = PurchaseRecord
-			  			.loadFromFile
-			  			.sortBy(_.day)
-			  			.groupBy(_.patientID);
-	  
+	/**
+	 * Classifies the whole dataset  
+	 */
+	def classify(purchases: Map[Int,List[models.PurchaseRecord]])
+	:Map[Int, List[(PatientType,PurchaseRecord)]] = {	  
 	  purchases.mapValues {records =>
 		  val (firstRun, secondRun) = records.span(_.medication == records.head.medication)
 		  
@@ -68,16 +90,23 @@ object AnalysisResult {
 	}
 
 	
-	
-	def classifyBatch(previous: List[PurchaseRecord], current: List[PurchaseRecord], status: PatientType): List[(PatientType, PurchaseRecord)] =
+	/**
+	 * Classifies a run of purchases by examining the previous, current and future runs. Internally, a 
+	 * state machine is used to impose a temporal ordering on the purchases.
+	 */
+	def classifyBatch(previous: List[PurchaseRecord], 
+					  current: List[PurchaseRecord], 
+					  status: PatientType) 
+	:List[(PatientType, PurchaseRecord)] =
 	{
-	   // The blocks are constructed so that previous the longest run of a single medication
-	   // so by construction there is a change in medication between previous and current.
-	  
+	   // By construction, the previous block contains only purchases of a single type of medication
+	   // so there must be a change of medications between the last purchase in previous and the first
+	   // purchase in current. Note that current DOES NOT have to contain only a single medication, it contains
+	   // the entire future purchase history.
 	   
 	   // selectCurrent is the next block of purchases. We construct it early as occasionally
 	   // we need to look into the future to make a decision
-	   val (selectCurrent, future) = current.span(_.medication == current.head.medication)
+	   val (nextMedication, future) = current.span(_.medication == current.head.medication)
 	   
 	   // if there's no overlap, they are independent admininstrations
 	   val newStatus = if (overlaps(previous.last, current.head)) {
@@ -87,7 +116,7 @@ object AnalysisResult {
 	         // otherwise, treat it as a switch
 		     case VALID_NO_COMED => 
 		     {
-		       if (selectCurrent.length == 1)
+		       if (nextMedication.length == 1)
 		         trials(current.head.medication) 
 		       else
 		         switches(current.head.medication)
@@ -112,10 +141,10 @@ object AnalysisResult {
 	  
 	   val retVal = List((newStatus, current.head))
 	   
-	   // Base and recursive cases for recursion
+	   // Base and recursive cases
 	   future match{
 	     case Nil => retVal
-	     case _   => retVal ++ classifyBatch(selectCurrent, future, newStatus)
+	     case _   => retVal ++ classifyBatch(nextMedication, future, newStatus)
 	   }
 	}
 	

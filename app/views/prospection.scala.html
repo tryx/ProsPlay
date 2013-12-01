@@ -19,15 +19,34 @@
 	          @for((patientClass, count) <-results) {
 	          	['@(patientClass)', @(count)],
 	          }
-	          
 	        ]);	
 	        var options = {
 	          title: 'B & I Analysis Result',
 	          pieHole: 0.4
 	        };	
 	        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
-	        google.visualization.events.addListener(chart, 'select', test);
-	        function test() {alert(chart.getSelection()[0].row)}
+	        google.visualization.events.addListener(chart,'select', function() {
+	        	var type = chart.getSelection()[0].row
+	        	fetchCustomersByType(chart.getSelection()[0].row)
+	        	
+	        	$("#details").load("/customer_type/" + type)
+	        	
+	        	// stops google API from freezing when double selecting a slice
+	        	chart.setSelection(type) 
+	        });
+	        
+	        function fetchCustomersByType(type) {
+	        	$("#details").load("/customer_type/" + type)
+	        }
+	        
+	        
+	        function handleChartSelection() {
+	        	var type = chart.getSelection()[0].row
+	        	fetchCustomersByType(chart.getSelection()[0].row)
+	        	
+	        	// stops google API from freezing when double selecting a slice
+	        	chart.setSelection(type) 
+	        }
 	        	         
 	        chart.draw(data, options);
 	      }

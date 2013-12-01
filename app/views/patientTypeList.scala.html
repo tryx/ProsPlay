@@ -1,0 +1,19 @@
+@** Called from Javascript as an AJAX request. Returns the set of patients
+    that fall into a given patient catagory.
+**@
+@(patients: List[List[PurchaseRecord]])
+<table>
+@for(transactions <- patients) {
+	<tr> <td>Patient: @transactions(0).patientID</td> </tr>
+	<tr>
+		<td> Day </td>
+		<td> Medication </td>
+	</tr>
+	@for(t <- transactions) {
+		<tr>
+			<td> @t.day </td>
+			<td> @t.medication </td>
+		</tr>
+	}	
+}
+</table>

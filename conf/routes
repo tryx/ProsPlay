@@ -7,4 +7,6 @@ GET     /                                       controllers.Application.index()
 
 GET		/data									controllers.Application.data()
 
-GET     /assets/*file               controllers.Assets.at(path="/public", file)
+GET     /assets/*file               			controllers.Assets.at(path="/public", file)
+
+GET		/customer_type/:id						controllers.Ajax.cusType(id: Int)
