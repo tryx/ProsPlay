@@ -3,6 +3,7 @@ import PatientType._
 import scala.collection._
 
 object AnalysisResult {
+	type PatientID = Int
   
 	// these are expensive to calculate and we don't want to redo it
 	// for every ajax call, so cache them here
@@ -60,7 +61,7 @@ object AnalysisResult {
 	 * with the time since the last purchase. A sliding window is moved along the purchase
 	 * history and the difference in dates is computed between each pair.
 	 */	
-	def dumpData(): Map[Int, List[(PurchaseRecord, Int)]] =
+	def dumpData(): Map[PatientID, List[(PurchaseRecord, Int)]] =
 	{	
 		// must prepend 0 to account for the very first puchase which is unpaired
 		purchases.mapValues {t => 
@@ -74,8 +75,8 @@ object AnalysisResult {
 	/**
 	 * Classifies the whole dataset  
 	 */
-	def classify(purchases: Map[Int,List[models.PurchaseRecord]])
-	:Map[Int, List[(PatientType,PurchaseRecord)]] = {	  
+	def classify(purchases: Map[PatientID,List[models.PurchaseRecord]])
+	:Map[PatientID, List[(PatientType,PurchaseRecord)]] = {	  
 	  purchases.mapValues {records =>
 		  val (firstRun, secondRun) = records.span(_.medication == records.head.medication)
 		  
