@@ -27,3 +27,12 @@ body {
 p {
 	margin-top: 50px;
 }
+
+#patients {
+	float: left;
+	width: 300px;
+}
+
+#transactions {
+	margin-left: 300px;
+}

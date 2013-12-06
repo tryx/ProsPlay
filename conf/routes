@@ -10,3 +10,5 @@ GET		/data									controllers.Application.data()
 GET     /assets/*file               			controllers.Assets.at(path="/public", file)
 
 GET		/customer_type/:id						controllers.Ajax.cusType(id: Int)
+
+GET		/customer_id/:id						controllers.Ajax.transactionList(id: Int)

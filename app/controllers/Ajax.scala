@@ -11,4 +11,11 @@ object Ajax extends Controller {
         (AnalysisResult.performBIAnalysis _2)(
             PatientType.values.toList(patientType))))
   }
+  
+  def transactionList(PatientID: Int) = Action {
+    Ok(views.html.patientTransactionList(
+        (AnalysisResult.dumpData).apply(PatientID), 
+        PatientID
+    ))
+  }
 }

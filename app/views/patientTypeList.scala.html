@@ -2,8 +2,9 @@
     that fall into a given patient catagory.
 **@
 @(patients: List[List[PurchaseRecord]])
-<table>
+
 @for(transactions <- patients) {
+	<table id="@transactions(0).patientID" class="patient">
 	<tr> <td>Patient: @transactions(0).patientID</td> </tr>
 	<tr>
 		<td> Day </td>
@@ -15,5 +16,5 @@
 			<td> @t.medication </td>
 		</tr>
 	}	
+	</table>
 }
-</table>
